@@ -112,22 +112,10 @@ timeout(time: 12, unit: 'HOURS') {
         currentBuild.result = 'FAILURE'
         throw e
     } finally {
-        println ("got the currentBuild.changeSets ${currentBuild.changeSets}")
         def isFirstBuild = currentBuild == null || currentBuild.changeSets ==  null
-        def authors = isFirstBuild ? [] : currentBuild.changeSets.collectMany { it.toList().collect { it.author.toString() }.unique() }
-        println ("got the authors ${authors}")
-        println ("contains userId 'github' ${authors.contains('github')}")
-
-        def author = null
-        if (currentBuild != null && currentBuild.changeSets != null && currentBuild.changeSets.size() &&
-                currentBuild.changeSets[currentBuild.changeSets.size() - 1].items.length) {
-            def items = currentBuild.changeSets[currentBuild.changeSets.size() - 1].items
-            author = items[items.length - 1].author.toString()
-        }
-        println("an author of the last commit ${author}")
-        authors = isFirstBuild ? [] : currentBuild.changeSets.last().toList().collect { it.author.toString() }.unique()
-        println("2 an author of the last commit ${author}")
-        //if (isFirstBuild || !authors.contains('github')) jenkinsNotify()
+        def authors = isFirstBuild ? [] : currentBuild.changeSets.last().toList().collect { it.author.toString() }.unique()
+        println("The author of the last change: ${authors}")
+        if (isFirstBuild || !authors.contains('github')) jenkinsNotify()
     }
 }
 
