@@ -112,6 +112,8 @@ timeout(time: 12, unit: 'HOURS') {
         currentBuild.result = 'FAILURE'
         throw e
     } finally {
+        def authors = currentBuild.changeSets.collectMany { it.toList().collect { it.author.toString() } }.unique()
+        println (authors)
         jenkinsNotify()
     }
 }
@@ -148,8 +150,8 @@ def buildProcess(String stageKey, String jdkName, String jdkTestName, String mvn
                 ]) {
                     sh 'echo JAVA_HOME=$JAVA_HOME, JAVA_HOME_IT=$JAVA_HOME_IT, PATH=$PATH'
                     def script = cmd + ['\"-Djdk.home=$JAVA_HOME_IT\"']
-                    def error = sh(returnStatus: true, script: script.join(' '))
-                    currentBuild.result = error == 0 ? 'SUCCESS' : 'FAILURE'
+                    //def error = sh(returnStatus: true, script: script.join(' '))
+                    //currentBuild.result = error == 0 ? 'SUCCESS' : 'FAILURE'
                 }
             } else {
                 withEnv(["JAVA_HOME=${tool(jdkName)}",
@@ -159,42 +161,12 @@ def buildProcess(String stageKey, String jdkName, String jdkTestName, String mvn
                 ]) {
                     bat 'echo JAVA_HOME=%JAVA_HOME%, JAVA_HOME_IT=%JAVA_HOME_IT%, PATH=%PATH%'
                     def script = cmd + ['\"-Djdk.home=%JAVA_HOME_IT%\"']
-                    def error = bat(returnStatus: true, script: script.join(' '))
-                    currentBuild.result = error == 0 ? 'SUCCESS' : 'FAILURE'
+                    //def error = bat(returnStatus: true, script: script.join(' '))
+                    //currentBuild.result = error == 0 ? 'SUCCESS' : 'FAILURE'
                 }
             }
         }
     } finally {
-        if (makeReports) {
-            openTasks(ignoreCase: true, canComputeNew: false, defaultEncoding: 'UTF-8', pattern: sourcesPatternCsv(),
-                    high: tasksViolationHigh(), normal: tasksViolationNormal(), low: tasksViolationLow())
-
-            jacoco(changeBuildStatus: false,
-                    execPattern: '**/*.exec',
-                    sourcePattern: sourcesPatternCsv(),
-                    classPattern: classPatternCsv())
-
-            junit(healthScaleFactor: 0.0,
-                    allowEmptyResults: true,
-                    keepLongStdio: true,
-                    testResults: testReportsPatternCsv())
-
-            if (currentBuild.result == 'UNSTABLE') {
-                currentBuild.result = 'FAILURE'
-            }
-        }
-
-        if (currentBuild.result != null && currentBuild.result != 'SUCCESS') {
-            if (fileExists('maven-failsafe-plugin/target/it')) {
-                zip(zipFile: "maven-failsafe-plugin--${stageKey}.zip", dir: 'maven-failsafe-plugin/target/it', archive: true)
-            }
-
-            if (fileExists('surefire-its/target')) {
-                zip(zipFile: "surefire-its--${stageKey}.zip", dir: 'surefire-its/target', archive: true)
-            }
-
-            archiveArtifacts(artifacts: "*--${stageKey}.zip", allowEmptyArchive: true, onlyIfSuccessful: false)
-        }
         // clean up after ourselves to reduce disk space
         cleanWs()
     }
