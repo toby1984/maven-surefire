@@ -30,7 +30,7 @@ properties(
     ]
 )
 
-final def oses = ['linux':'ubuntu && !H24', 'windows':'Windows && !windows-2016-1']
+final def oses = ['windows':'Windows']
 final def mavens = env.BRANCH_NAME == 'master' ? ['3.6.x', '3.2.x'] : ['3.6.x']
 // all non-EOL versions and the first EA
 final def jdks = [12, 11, 8, 7]
@@ -113,9 +113,19 @@ timeout(time: 12, unit: 'HOURS') {
         throw e
     } finally {
         println ("got the currentBuild.changeSets ${currentBuild.changeSets}")
-        def authors = currentBuild.changeSets.collectMany { it.toList().collect { it.author.toString() } }.unique()
+        def isFirstBuild = currentBuild == null || currentBuild.changeSets ==  null
+        def authors = isFirstBuild ? [] : currentBuild.changeSets.collectMany { it.toList().collect { it.author.toString() } }
         println ("got the authors ${authors}")
-        jenkinsNotify()
+        println ("contains userId 'github' ${authors.contains('github')}")
+
+        def author = null
+        if (currentBuild != null && currentBuild.changeSets != null && currentBuild.changeSets.size() &&
+                currentBuild.changeSets[currentBuild.changeSets.size() - 1].items.length) {
+            def items = currentBuild.changeSets[currentBuild.changeSets.size() - 1].items
+            author = items[items.length - 1].author.toString()
+        }
+        println("an author of the last commit ${author}")
+        if (isFirstBuild || !authors.contains('github')) jenkinsNotify()
     }
 }
 
