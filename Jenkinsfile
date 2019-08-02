@@ -112,8 +112,9 @@ timeout(time: 12, unit: 'HOURS') {
         currentBuild.result = 'FAILURE'
         throw e
     } finally {
+        println ("got the currentBuild.changeSets ${currentBuild.changeSets}")
         def authors = currentBuild.changeSets.collectMany { it.toList().collect { it.author.toString() } }.unique()
-        println (authors)
+        println ("got the authors ${authors}")
         jenkinsNotify()
     }
 }
