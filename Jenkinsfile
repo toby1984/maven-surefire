@@ -31,7 +31,7 @@ properties(
 )
 
 final def oses = ['linux':'ubuntu && !H23 && !H29 && !H30 && !H40 && !H41', 'windows':'Windows']
-final def mavens = env.BRANCH_NAME == 'master' ? ['3.6.x', '3.2.x'] : ['3.0.x']
+final def mavens = env.BRANCH_NAME == 'master' ? ['3.6.x', '3.2.x'] : ['3.1.x']
 // all non-EOL versions and the first EA
 final def jdks = [14, 13, 11, 8, 7]
 
@@ -49,6 +49,11 @@ oses.eachWithIndex { osMapping, indexOfOs ->
             final String jdkName = jenkinsEnv.jdkFromVersion(os, '8')
             final String mvnName = jenkinsEnv.mvnFromVersion(os, maven)
             final String stageKey = "${os}-jdk${jdk}-maven${maven}"
+
+            if (mvnName.contains('3.1') && mvnName.contains('Windows')) {
+                println "Skipping ${stageKey} as unsupported by Jenkins Tool."
+                return
+            }
 
 // Referenses for TLS:
 // https://central.sonatype.org/articles/2018/May/04/discontinued-support-for-tlsv11-and-below/?__hstc=31049440.ab2fd229e7f8b6176196d9f78621e1f5.1534324377408.1534324377408.1534324377408.1&__hssc=31049440.1.1534324377409&__hsfp=2729160845
