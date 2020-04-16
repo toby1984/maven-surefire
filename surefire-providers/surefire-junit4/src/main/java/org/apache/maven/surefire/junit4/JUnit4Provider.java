@@ -28,11 +28,7 @@ import org.apache.maven.surefire.common.junit4.JUnitTestFailureListener;
 import org.apache.maven.surefire.common.junit4.Notifier;
 import org.apache.maven.surefire.providerapi.AbstractProvider;
 import org.apache.maven.surefire.providerapi.ProviderParameters;
-import org.apache.maven.surefire.report.ConsoleOutputReceiver;
-import org.apache.maven.surefire.report.PojoStackTraceWriter;
-import org.apache.maven.surefire.report.ReporterFactory;
-import org.apache.maven.surefire.report.RunListener;
-import org.apache.maven.surefire.report.SimpleReportEntry;
+import org.apache.maven.surefire.report.*;
 import org.apache.maven.surefire.suite.RunResult;
 import org.apache.maven.surefire.testset.TestListResolver;
 import org.apache.maven.surefire.testset.TestRequest;
@@ -47,8 +43,16 @@ import org.junit.runner.Runner;
 import org.junit.runner.manipulation.Filter;
 import org.junit.runner.notification.StoppedByUserException;
 
+import java.io.File;
+import java.io.FileWriter;
+import java.io.PrintWriter;
+import java.time.Instant;
+import java.time.temporal.TemporalUnit;
+import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 
 import static java.lang.reflect.Modifier.isAbstract;
 import static java.lang.reflect.Modifier.isInterface;
@@ -348,16 +352,93 @@ public class JUnit4Provider
         return System.getProperty( "surefire.junit4.upgradecheck" ) != null;
     }
 
-    private static void execute( Class<?> testClass, Notifier notifier, Filter filter )
+    private static void print(Description desc)
+    {
+        final long pid = ProcessHandle.current().pid();
+        final String path = "/tmp/"+pid+"_debug.txt";
+        final File file = new File(path);
+        PrintWriter w = null;
+        try {
+            w = new PrintWriter(new FileWriter(file,true),true);
+            print(desc,w);
+        } catch(Exception e) {
+            if ( w != null ) {
+                w.close();
+            }
+        }
+    }
+
+    private static final Pattern DESC_PATTERN = Pattern.compile("(.*?)\\((.*?)\\)");
+
+    private static void print(Description desc, PrintWriter logger)
+    {
+        print(desc, Instant.now(),logger);
+    }
+
+    private static void print(Description desc, Instant now, PrintWriter logger)
+    {
+        final String text;
+        final Matcher m = DESC_PATTERN.matcher(desc.getDisplayName());
+        if ( m.matches() && m.groupCount() == 2 ) {
+            text = m.group(1)+";"+m.group(2);
+        } else {
+            text = desc.getDisplayName();
+        }
+
+        final long second = now.getEpochSecond();
+        final int nano = now.getNano();
+        logger.println( second+"."+nano+";"+text);
+
+        final ArrayList<Description> children = desc.getChildren();
+        if ( ! children.isEmpty() ) {
+            for ( Description d : children ) {
+                print(d, now, logger );
+            }
+        }
+    }
+
+    private static void execute( Class<?> testClass, Notifier notifier, final Filter filter)
     {
         final int classModifiers = testClass.getModifiers();
         if ( !isAbstract( classModifiers ) && !isInterface( classModifiers ) )
         {
             Request request = aClass( testClass );
+            Filter wrapper;
             if ( filter != null )
             {
-                request = request.filterWith( filter );
+                wrapper = new Filter() {
+
+                    @Override
+                    public boolean shouldRun(Description description)
+                    {
+                        print(description);
+                        return filter.shouldRun(description);
+                    }
+
+                    @Override
+                    public String describe()
+                    {
+                        return "my wrapper";
+                    }
+                };
+            } else {
+                wrapper = new Filter() {
+
+                    @Override
+                    public boolean shouldRun(Description description)
+                    {
+                        print(description);
+                        return true;
+                    }
+
+                    @Override
+                    public String describe()
+                    {
+                        return "my wrapper";
+                    }
+                };
             }
+            request = request.filterWith(wrapper);
             Runner runner = request.getRunner();
             if ( countTestsInRunner( runner.getDescription() ) != 0 )
             {
